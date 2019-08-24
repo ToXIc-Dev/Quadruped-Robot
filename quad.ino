@@ -13,6 +13,9 @@
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <Servo.h> 
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#include "RemoteDebug.h"
 
 // RUN
 // Open serial monitor 9600bps and Input numeric.
@@ -60,14 +63,18 @@
 // | SP2 |      | SP3 |
 //  -----        -----  
 //BACK
+
+// a,90,90,90,90,90,90,90,90 [Enter]
+// s,1,90 [Enter]
   
 //===== Globals ============================================================================ 
 /* define port */
 //WiFiClient client;
 ESP8266WebServer server(80);
+RemoteDebug Debug;
 
-String Hostname = "Quad"; // The network name
-char* Hostname2 = &Hostname[0];
+char* Hostname = "Quad"; // The network name
+char* otaPass = "quadbot"; // The network name
 
 #define MAX_SERVO_NUM 8
 Servo servo[MAX_SERVO_NUM+1];
@@ -97,7 +104,7 @@ int f = 0;
 int b = 0;
 int l = 0;
 int r = 0;
-int spd = 3;// Speed of walking motion, larger the number, the slower the speed
+int spd = 50;// Speed of walking motion, larger the number, the slower the speed
 int high = 0;// How high the robot is standing
 
 // Define 8 Servos 
@@ -146,13 +153,14 @@ a:link {
 
 <button onclick="SendCommand('stepl')">Step Left</button> | <button onclick="SendCommand('stepr')">Step Right</button><br><br>
 <button onclick="SendCommand('leanl')">Lean Left</button> | <button onclick="SendCommand('leanr')">Lean Right</button><br><br>
-<button onclick="SendCommand('lay')">Lay</button> | <button onclick="SendCommand('s2s')">Side to Side</button> 
+<button onclick="SendCommand('lay')">Lay</button> | <button onclick="SendCommand('s2s')">Side to Side</button><br><br>
+<button onclick="SendCommand('fightst')">Fighting Stance</button> 
 <script>
 function SendCommand(Command) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
   };
-  xhttp.open("GET", "/" + Command + "", true);
+  xhttp.open("GET", "/api?command=" + Command + "", true);
   xhttp.send();
 }
 </script>
@@ -166,13 +174,122 @@ void handleRoot() {
  server.send(200, "text/html", s); //Send web page
 }
 
+void handleSpecificArg() { 
+
+String message = "Invalid or No command given";
+
+if (server.arg("command")== ""){    //Parameter not found
+
+}else{     //Parameter found
+
+if (server.arg("command") == "forward"){
+  forward();
+  message = "Received";
+}
+if (server.arg("command") == "backward"){
+  back();
+  message = "Received";
+}
+if (server.arg("command") == "left"){
+  turn_left();
+  message = "Received";
+}
+if (server.arg("command") == "right"){
+  turn_right();
+  message = "Received";
+}
+if (server.arg("command") == "stop"){
+  center_servos();
+  message = "Received";
+}
+if (server.arg("command") == "minimal"){
+  minimal();
+  message = "Received";
+}
+if (server.arg("command") == "leanl"){
+  lean_left();
+  message = "Received";
+}
+if (server.arg("command") == "leanr"){
+  lean_right();
+  message = "Received";
+}
+if (server.arg("command") == "stepl"){
+  step_left();
+  message = "Received";
+}
+if (server.arg("command") == "stepr"){
+  step_right();
+  message = "Received";
+}
+if (server.arg("command") == "lay"){
+  lay();
+  message = "Received";
+}
+if (server.arg("command") == "s2s"){
+  side2side();
+  message = "Received";
+}
+if (server.arg("command") == "fightst"){
+  fightst();
+  message = "Received";
+}
+
+String parseArg = getValue(server.arg("command"), ',', 0); // if  a,4,D,r  would return D  
+if (parseArg == "s" || parseArg == "S"){
+  int servoN = getValue(server.arg("command"), ',', 1).toInt(); // if  a,4,D,r  would return D 
+  int sAngle = getValue(server.arg("command"), ',', 2).toInt(); // if  a,4,D,r  would return D
+  if ( 0 <= servoN &&  servoN < MAX_SERVO_NUM+1 )
+      {
+        // Single Servo Move
+        servo[servoN].write(sAngle);
+
+        // Wait Servo Move
+        //delay(300); // 180/60(°/100msec）=300(msec)
+      }
+  message = "Received";
+  Debug.println("Servo moved");
+}
+
+if (parseArg == "a" || parseArg == "A"){
+  int angle[MAX_SERVO_NUM];
+  angle[0] = getValue(server.arg("command"), ',', 1).toInt(); // if  a,4,D,r  would return D 
+  angle[1] = getValue(server.arg("command"), ',', 2).toInt(); // if  a,4,D,r  would return D 
+  angle[2] = getValue(server.arg("command"), ',', 3).toInt(); // if  a,4,D,r  would return D 
+  angle[3] = getValue(server.arg("command"), ',', 4).toInt(); // if  a,4,D,r  would return D 
+  angle[4] = getValue(server.arg("command"), ',', 5).toInt(); // if  a,4,D,r  would return D
+  angle[5] = getValue(server.arg("command"), ',', 6).toInt(); // if  a,4,D,r  would return D
+  angle[6] = getValue(server.arg("command"), ',', 7).toInt(); // if  a,4,D,r  would return D
+  angle[7] = getValue(server.arg("command"), ',', 8).toInt(); // if  a,4,D,r  would return D
+  
+  set8Pos( angle[0], angle[1], angle[2], angle[3], angle[4], angle[5], angle[6], angle[7] );
+  message = "Received";
+  Debug.println("Servos moved");
+}
+
+
+
+}
+// String  var = getValue( StringVar, ',', 2); // if  a,4,D,r  would return D  
+server.send(200, "text/plain", message);          //Returns the HTTP response
+
+}
+
 //===== Setup ============================================================================== 
 void setup() {
   Serial.begin (9600);
-  WiFi.hostname(Hostname2);
+  WiFi.hostname(Hostname);
   WiFiManager wifiManager;
   wifiManager.setDebugOutput(false);
-  wifiManager.autoConnect(Hostname2);
+  wifiManager.autoConnect(Hostname);
+
+// Initialize the server (telnet or web socket) of RemoteDebug
+Debug.begin(Hostname);
+// OR
+//Debug.begin(HOST_NAME, startingDebugLevel);
+// Options
+Debug.setResetCmdEnabled(true); // Enable the reset command
+// Debug.showProfiler(true); // To show profiler - time between messages of Debug
 
   String IPString = WiFi.localIP().toString();
   Serial.println(IPString);
@@ -186,21 +303,30 @@ void setup() {
   delay(300);
   
   server.on("/", handleRoot);    
-  server.on("/forward", forward );
-  server.on("/backward", back );
-  server.on("/left", turn_left );
-  server.on("/right", turn_right );
-  server.on("/stop", center_servos );
-  server.on("/minimal", minimal );
-  server.on("/leanl", lean_left );
-  server.on("/leanr", lean_right );
-  server.on("/stepl", step_left );
-  server.on("/stepr", step_right );
-  server.on("/lay", lay );
-  server.on("/s2s", side2side );
+  server.on("/api", handleSpecificArg);   //Associate the handler function to the path
   
   server.begin();                                       //Start the server
   Serial.println("Server listening");   
+  
+  ArduinoOTA.setPassword((const char *)otaPass);
+    ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
 }
 
 //setup 
@@ -219,7 +345,8 @@ void loop() {
 
 //attachServo();
 server.handleClient(); 
-
+  ArduinoOTA.handle();
+  Debug.handle();
  if (Serial.available() > 0) {
 
     char command = Serial.read();
@@ -268,9 +395,24 @@ server.handleClient();
 
  //   detachServo(); 
  }
-  
     
 }//loop
+
+String getValue(String data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length();
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}  // END
 
 // Set 8 ServoMotor angles
 void set8Pos(int a, int b, int c, int d, int e, int f, int g, int h){
@@ -376,7 +518,7 @@ void forward() {
   //
   srv(a180, b0, c120, d60, 42, 15, 33, 42, 1, 3, 1, 1);
 //  Serial.println("Forward");
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== Back ================================================================================== 
@@ -393,7 +535,7 @@ void back () {
   //
 //  srv(180, 0, 120, 60, 6, 33, 33, 42, 3, 1, 1, 1);
   srv(160,20, 120, 60, 18, 33, 33, 42, 3, 1, 1, 1);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== Left =================================================================================
@@ -408,7 +550,7 @@ void turn_left () {
   srv(90, 30, 150, 90, 42, 33, 33, 42, 1, 1, 1, 3);
   srv(180, 0, 120, 60, 6, 33, 33, 42, 3, 1, 1, 1);
   srv(180, 0, 120, 60, 42, 33, 33, 33, 3, 1, 1, 1);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== Right ================================================================================
@@ -423,7 +565,7 @@ void turn_right () {
   srv(150, 90, 90, 30, 42, 33, 33, 42, 1, 1, 3, 1);
   srv(180, 0, 120, 60, 42, 6, 33, 42, 1, 3, 1, 1);
   srv(180, 0, 120, 60, 42, 33, 33, 42, 1, 3, 1, 1);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== Right Step================================================================================
@@ -448,7 +590,7 @@ void step_right () {
   servo[6].write(40);
   servo[8].write(140);
   delay(700);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 //== Left Step ================================================================================
 void step_left () { 
@@ -472,7 +614,7 @@ void step_left () {
   servo[6].write(130);
   servo[8].write(50);
   delay(700);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== Center Servos ======================================================================== 
@@ -487,7 +629,7 @@ void center_servos() {
   servo[6].write(90);
   servo[8].write(90);
   delay(500);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== minimal Servos ======================================================================== 
@@ -502,7 +644,21 @@ void minimal() {
   servo[5].write(140);
   servo[7].write(40);
   delay(700);
-  server.send(200, "text/plain", "Recieved");
+  
+}
+
+//== Fighting Stance ======================================================================== 
+void fightst() {
+  servo[1].write(140);
+  servo[3].write(40);
+  servo[5].write(140);
+  servo[7].write(40);
+  servo[2].write(90);
+  servo[4].write(90);
+  servo[6].write(90);
+  servo[8].write(90);
+  delay(500);
+  
 }
 
 //== lay ======================================================================== 
@@ -517,7 +673,7 @@ void lay() {
   servo[5].write(140);
   servo[7].write(40);
   delay(700);
-  server.send(200, "text/plain", "Recieved");
+  
 }
 
 //== side to side ======================================================================== 
@@ -526,7 +682,7 @@ void side2side() {
   lean_right();
   lean_left();
   lean_right();
-  server.send(200, "text/plain", "Recieved");
+  
 }
 //== Increase Speed ========================================================================
 void increase_speed() {
