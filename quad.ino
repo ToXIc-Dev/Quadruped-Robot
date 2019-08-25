@@ -31,8 +31,8 @@
 // 8 back
 // 9 step_right
 
-//Arduroid4 (Top View)
-//FLONT
+//Quad (Top View)
+//FRONT
 //  -----               -----
 // |  2  |             |  8  |
 // | P03 |             | P09 |
@@ -154,7 +154,7 @@ a:link {
 <button onclick="SendCommand('stepl')">Step Left</button> | <button onclick="SendCommand('stepr')">Step Right</button><br><br>
 <button onclick="SendCommand('leanl')">Lean Left</button> | <button onclick="SendCommand('leanr')">Lean Right</button><br><br>
 <button onclick="SendCommand('lay')">Lay</button> | <button onclick="SendCommand('s2s')">Side to Side</button><br><br>
-<button onclick="SendCommand('fightst')">Fighting Stance</button> 
+<button onclick="SendCommand('fightst')">Fighting Stance</button>  | <button onclick="SendCommand('bow')">bow</button><br><br>
 <script>
 function SendCommand(Command) {
   var xhttp = new XMLHttpRequest();
@@ -167,6 +167,19 @@ function SendCommand(Command) {
 
 </body>
 </html>
+)=====";
+
+const char DOC_page[] PROGMEM = R"=====(
+<HTML>
+  <HEAD>
+      <TITLE>Quad Control API</TITLE>
+  </HEAD>
+<BODY>
+  <CENTER>
+  <h2>Received</h2> <br><br>
+      <h2>Servo Layout</h2>
+<img src='data:image/png;base64,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' alt=''></BODY>
+</HTML>
 )=====";
 
 void handleRoot() {
@@ -234,6 +247,10 @@ if (server.arg("command") == "fightst"){
   fightst();
   message = "Received";
 }
+if (server.arg("command") == "bow"){
+  bow();
+  message = "Received";
+}
 
 String parseArg = getValue(server.arg("command"), ',', 0); // if  a,4,D,r  would return D  
 if (parseArg == "s" || parseArg == "S"){
@@ -271,7 +288,9 @@ if (parseArg == "a" || parseArg == "A"){
 
 }
 // String  var = getValue( StringVar, ',', 2); // if  a,4,D,r  would return D  
-server.send(200, "text/plain", message);          //Returns the HTTP response
+//server.send(200, "text/plain", message);          //Returns the HTTP response
+String s = DOC_page; //Read HTML contents
+ server.send(200, "text/html", s); //Send web page
 
 }
 
@@ -650,8 +669,8 @@ void minimal() {
 //== Fighting Stance ======================================================================== 
 void fightst() {
   servo[1].write(140);
-  servo[3].write(40);
-  servo[5].write(140);
+  servo[3].write(90);
+  servo[5].write(90);
   servo[7].write(40);
   servo[2].write(90);
   servo[4].write(90);
@@ -672,6 +691,32 @@ void lay() {
   servo[3].write(40);
   servo[5].write(140);
   servo[7].write(40);
+  delay(700);
+  
+}
+
+//== bow ======================================================================== 
+void bow() {
+  servo[1].write(140);
+  servo[3].write(90);
+  servo[5].write(90);
+  servo[7].write(40);
+  servo[2].write(90);
+  servo[4].write(90);
+  servo[6].write(90);
+  servo[8].write(90);
+  delay(300);
+  servo[2].write(50);
+  servo[8].write(130);
+  delay(300);
+  servo[2].write(90);
+  servo[8].write(90);
+  delay(300);
+  servo[2].write(50);
+  servo[8].write(130);
+  delay(300);
+  servo[2].write(90);
+  servo[8].write(90);
   delay(700);
   
 }
